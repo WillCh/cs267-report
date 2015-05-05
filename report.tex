@@ -65,29 +65,40 @@ Butterfly mixing was proposed in \cite{zhao2013butterfly} to interleave communic
 
 
 \section{Data parallelization and Model Averging}
+Gradient descent method is applied to train the DNN model even it's a non-convex optimization problem. Since the size of training data is large, batch training is applied to approximately compute the gradient for each iteration. Rougly, the larger batch size, the higher converge speed. However, the large batch size brings the computing time and memory usage problem. With using distributed system, the gradient can be computed at each node, communicate among all the nodes, and average recieved gradient at each update iteration. This method can compute the reduced gradient accurategly, but it requires heavy communication, since we need to communicate at each update iteration. \\
 
+However, if the weight rather than gradient of weight is choosen to reduce and average, it is not necessary to communicate the weight at each iteration. Thus, in this project, we choose to communicate the weight for some fixed iterations steps. 
 \section{Different Reduce Strategies}
+In this section, the three data reduce strategies are introduced, which are all-reduce, butterfly mixing and ring/hopping rIng reduce.
 
+\subsection{All-reduce}
+
+All-reduce startegy collects the weights from all the nodes in the network. The communication is bounded by the bandwidth. Fig.~1 is an example of all-reduce with 4 nodes. After one node collects all the weights, it will average the weights and then boardcast it too all the nodes. Thus, the all-reduce requires at least twice communication to collect and boardcast the messages. However, the all-reduce can compute the average weight based on full information for the whole network. Thus, the converge speed of all-reduce should be the fastest.
+\begin{figure}[h!]
+  
+  \centering
+    \includegraphics[width=0.5\textwidth]{allreduce.jpg}
+    \caption{All-reduce network}
+\end{figure}
 \subsection{Butterfly Mixing}
-
-All printed material, including text, illustrations, and charts, must be kept
-within a print area of 7 inches (178 mm) wide by 9 inches (229 mm) high. Do
-not write or print anything outside the print area. The top margin must be 1
-inch (25 mm), except for the title page, and the left margin must be 0.75 inch
-(19 mm).  All {\it text} must be in a two-column format. Columns are to be 3.39
-inches (86 mm) wide, with a 0.24 inch (6 mm) space between them. Text must be
-fully justified.
+ 
+Zhao and Canny (2012) proposed the butterfly mixing strategy. The butterfly mixing can reduce the communication for each iteartion: one node would only send and recieve message from one other node. But their communication orders are changed so that information for the whole network still can be spread to all nodes. Fig.~2 is an example of butterfly mixing with 4 nodes. The communication of butterfly mixing is bounded by the lantency. And butterfly mixing only require once communication to collect and average the weight, it does not need to send the averaged weight. Thus, the butterfly mixing has much less communication amount than all-reduce strategy. However, one node at butterfly mixing network only collect partial information from the network, its averaged weight can only reflect the information from two nodes. It takes $log(number of nodes)$ communication times to spread the message to the whole network. Thus, the converge speed of butterfly mixing is slower than all-reduce strategy. 
+\begin{figure}[h!]
+  
+  \centering
+    \includegraphics[width=0.5\textwidth]{butterfly.jpg}
+    \caption{Butterfly mixing network.}
+\end{figure}
 
 \subsection{Ring \& Hopping Ring Reduce}
 
-The paper title (on the first page) should begin 1.38 inches (35 mm) from the
-top edge of the page, centered, completely capitalized, and in Times 14-point,
-boldface type.  The authors' name(s) and affiliation(s) appear below the title
-in capital and lower case letters.  Papers with multiple authors and
-affiliations may require two or more lines for this information. Please note
-that papers should not be submitted blind; include the authors' names on the
-PDF.
-
+Each node in ring reduce network would send message to the next node, and receive message from the previous node, see Fig.~3. Similar as the butterfly mixing, ring network is bounded by the network latency. Ring network also only requires once communication to send and collect the weight. However, the ring network requires $number of nodes$ communication times to spread the message thoughout the whole network. Thus, the converge speed of ring network is the slowest among these three networks. 
+\begin{figure}[h!]
+  
+  \centering
+    \includegraphics[width=0.5\textwidth]{ring.jpg}
+    \caption{Ring network}
+\end{figure}
 \section{Natural Gradient for Model Update}
 
 \section{Experimental Results}
