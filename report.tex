@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage[top=1in, bottom=1.25in, left=1.05in, right=1.05in]{geometry}
+\usepackage[top=1in, bottom=1.25in, left=1.10in, right=1.10in]{geometry}
 \usepackage{amsmath,graphicx,multicol,multirow}
 
 % Example definitions.
@@ -9,7 +9,7 @@
 
 % Title.
 % ------
-\title{Investigation on Parallelization of Deep Neural Network Training using Multiple GPUs}
+\title{Parallelization of Neural Network Training using Model Averaging and Butterfly Mixing}
 %
 % Single address.
 % ---------------
@@ -22,12 +22,12 @@
 \maketitle
 %
 \begin{abstract}
-In this work we introduce Butterfly mixing to parallel training of deep neural networks (DNN). Parallelization is done
+In this work, we introduce Butterfly mixing to parallel training of deep neural networks (DNN). Parallelization is done
 in a model averaging manner. Data is partitioned and distributed to different nodes for local model update, and
 model averaging (reduce) is done every few minibatches. We compare several different reduce stratgies, including
-all reduce, butterfly mixing, ring reduce. We show that all these methods can effectively
-speed up neural network training. On swithboard data, a xx times speed up is achieved using 16 gpus.
-
+all-reduce, butterfly mixing, ring reduce. We show that all these methods can effectively
+speed up neural network training. On TIMIT data set, a 10x speed up is achieved using 16 gpus when natural gradient
+based stochastic gradient descent is used.
 \end{abstract}
 %
 %
@@ -45,10 +45,7 @@ Optimality for parallelization of DNN training was analyzed in \cite{seide2014pa
 a gradient quantization approach was proposed to minimize communication cost \cite{seide20141}.
 
 DistBelief proposed in \cite{dean2012large} reports a speed up of 2.2x using 8 CPU coresthan using a
-single machine.
-
-
-Asynchronous SGD using multiple GPUs achieved a 3.2x speed-up on 4 GPUs \cite{zhang2013asynchronous}.
+single machine. Asynchronous SGD using multiple GPUs achieved a 3.2x speed-up on 4 GPUs \cite{zhang2013asynchronous}.
 
 A pipeline training approach was propoased in \cite{chen2012pipelined} and a 3.3x speedup was achieved using 4 GPUs, but this
 method does not scale beyond number of layers in the neural network.
@@ -60,9 +57,7 @@ local structure of the neural network could be exploited.
 Distributed model averaging using CPUs is proposed in \cite{zhang2014improving},
 and a further improvement is done using natural gradient \cite{povey2014parallel}.
 
-
 Butterfly mixing was proposed in \cite{zhao2013butterfly} to interleave communication with computation.
-
 
 \section{Data parallelization and Model Averging}
 Gradient descent method is applied to train the DNN model even it's a non-convex optimization problem. 
@@ -82,32 +77,50 @@ In this section, the three data reduce strategies are introduced, which are all-
 butterfly mixing and ring reduce.
 
 \subsection{All-reduce}
-
-All-reduce startegy collects the weights from all the nodes in the network. The communication is bounded by the bandwidth. Fig.~1 is an example of all-reduce with 4 nodes. After one node collects all the weights, it will average the weights and then boardcast it too all the nodes. Thus, the all-reduce requires at least twice communication to collect and boardcast the messages. However, the all-reduce can compute the average weight based on full information for the whole network. Thus, the converge speed of all-reduce should be the fastest.
+All-reduce startegy collects the weights from all the nodes in the network. The communication is bounded by 
+the bandwidth. Fig~\ref{fig:allreduce} is an example of all-reduce with 4 nodes. After one node collects all 
+the weights, it will average the weights and then boardcast it too all the nodes. Thus, the all-reduce 
+requires at least twice communication to collect and boardcast the messages. However, the all-reduce can 
+compute the average weight based on full information for the whole network. Thus, the converge speed of 
+all-reduce should be the fastest.
 \begin{figure}[htb]
   \centering
   \includegraphics[width=0.5\textwidth]{allreduce.jpg}
   \caption{All-reduce network}
+  \label{fig:allreduce}
 \end{figure}
+
+
 \subsection{Butterfly Mixing}
- 
 Butterfly mixing a reduction strategy is proposed in \cite{zhao2013butterfly}. It reduces the communication for each 
 iteartion: one node would only send and recieve message from one other node, but their communications ensure information 
-for the whole network still can be spread to all nodes. Fig.~2 is an example of butterfly mixing with 4 nodes. The communication of butterfly mixing is bounded by the lantency. And butterfly mixing only require once communication to collect and average the weight, it does not need to send the averaged weight. Thus, the butterfly mixing has much less communication amount than all-reduce strategy. However, one node at butterfly mixing network only collect partial information from the network, its averaged weight can only reflect the information from two nodes. It takes $log(number of nodes)$ communication times to spread the message to the whole network. Thus, the converge speed of butterfly mixing is slower than all-reduce strategy. 
+for the whole network still can be spread to all nodes. Fig~\ref{fig:butterfly} is an example of butterfly mixing with 4 
+nodes. The communication of butterfly mixing is bounded by the lantency. And butterfly mixing only require 
+once communication to collect and average the weight, it does not need to send the averaged weight. Thus, the 
+butterfly mixing has much less communication amount than all-reduce strategy. However, one node at butterfly mixing 
+network only collect partial information from the network, its averaged weight can only reflect the information 
+from two nodes. It takes $log(number of nodes)$ communication times to spread the message to the whole network. 
+Thus, the converge speed of butterfly mixing is slower than all-reduce strategy. 
 \begin{figure}[htb]
   \centering
   \includegraphics[width=0.5\textwidth]{butterfly.jpg}
-  \caption{Butterfly mixing network.}
+  \caption{Butterfly mixing network}
+  \label{fig:butterfly}
 \end{figure}
 
-\subsection{Ring \& Hopping Ring Reduce}
-
-Each node in ring reduce network would send message to the next node, and receive message from the previous node, see Fig.~3. Similar as the butterfly mixing, ring network is bounded by the network latency. Ring network also only requires once communication to send and collect the weight. However, the ring network requires $number of nodes$ communication times to spread the message thoughout the whole network. Thus, the converge speed of ring network is the slowest among these three networks. 
+\subsection{Ring Reduce}
+Each node in ring reduce network would send message to the next node, and receive message from the previous node, 
+see Fig~\ref{fig:ring}. Similar as the butterfly mixing, ring network is bounded by the network latency. Ring network also 
+only requires once communication to send and collect the weight. However, the ring network requires $number of nodes$ 
+communication times to spread the message thoughout the whole network. Thus, the converge speed of 
+ring network is the slowest among these three networks. 
 \begin{figure}[htb]
   \centering
   \includegraphics[width=0.5\textwidth]{ring.jpg}
   \caption{Ring network}
+  \label{fig:ring}
 \end{figure}
+
 \section{Natural Gradient for Model Update}
 In stochastic gradient descent (SGD), the learning rate is often assumed to be a scalar $\alpha_t$ that may change over time,
 the update formula for model parameters $\theta_{t}$ is
@@ -134,9 +147,28 @@ in this report. Details about implementation of NG-SGD could be found in \cite{p
 
 \section{Experiments}
 \subsection{Setup}
-Experiments are conducted on TIMIT data set \cite{timit}.
+Experiments are conducted on TIMIT data set \cite{timit}. TIMIT is a continuous time speech recognition task where.
+
+The training data contains 462 speakers, Dev set contains 50 speakers, and test set contains 24 speakers. Each
+speaker has 8 utterances (3 seconds per utterance on average).
 
 \subsection{Convergence}
+Our neural network training use a learning rate schedule stated as below:
+\begin{itemize}
+\item The training starts with a pre-defined learning rate.
+\item After each iteration (one pass of training data), we evaluate the objective on dev data. If the 
+objective does not improve, we reject the trained model (rollback to the last model), and start halving 
+the learning rate and retrain. If the objective does not improve more than 1\%, we accept the model 
+and start halving the learning rate.
+\item Once we start halving the learning rate, the learning rate is reduced to half in each of the 
+following interation.
+\item The training is stopped if it reaches the pre-defined maximum iteration (20) or the learning rate
+has been halved for 6 times.
+\end{itemize}
+
+The convergence results on dev set are shown in Table~\ref{tab:converge}. It is shown that 
+the converged objective becomes worse as the number of jobs increases. Out the the three
+reduction method, allreduce performs best.
 \begin{table}
   \centering
   \begin{tabular}{c|c|c|c|c|c|c}
@@ -154,10 +186,12 @@ Experiments are conducted on TIMIT data set \cite{timit}.
     \hline
   \end{tabular}
   \caption{Convergence status on CV set}
-
+  \label{tab:converge}
 \end{table}
 
 \subsection{Speedup and scaling factor}
+Table~\ref{tab:speedup} shows
+
 \begin{table}
   \centering
   \begin{tabular}{c|c|c|c|c|c|c}
@@ -175,9 +209,11 @@ Experiments are conducted on TIMIT data set \cite{timit}.
     \hline
   \end{tabular}
   \caption{Training time and speedup}
+  \label{tab:speedup}
 \end{table}
 
 \subsection{Recognition results}
+Table~\ref{tab:wer} shows
 \begin{table}
   \centering
   \begin{tabular}{c|c|c|c|c|c}
@@ -190,14 +226,19 @@ Experiments are conducted on TIMIT data set \cite{timit}.
     \hline
   \end{tabular}
   \caption{Word error rate on different setup}
+  \label{tab:wer}
 \end{table}
 
 \section{Conclusion}
-
-
+Neural network training can be efficiently speed up by using model averaging techniques.
+Natural gradient method contributes to the convergence rate in model averaging setup.
+Butterfly-mixing and ring reduction can reduce communication time in a further step.
+Training using Butterfly-mixing and ring reduction does not converge well as the number of jobs goes up to 16.
 
 \section{Acknowledgements}
-We would like to thank Forrest Iandola for helpful suggestion.
+We would like to thank Karel Vesely for who wrote the original "nnet1" neural network training code
+upon which the work here is based. We would also like to thank Nelson Morgan, Forrest Iandola and Yuansi Chen
+for their helpful suggestions.
 
 % References should be produced using the bibtex program from suitable
 % BiBTeX files (here: strings, refs, manuals). The IEEEbib.bst bibliography
