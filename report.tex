@@ -152,7 +152,8 @@ Experiments are conducted on TIMIT data set \cite{timit}. TIMIT is a continuous 
 The training data contains 462 speakers, Dev set contains 50 speakers, and test set contains 24 speakers. Each
 speaker has 8 utterances (3 seconds per utterance on average).
 
-\subsection{Convergence}
+We fixed the total number of data points that we iterated to train the model. Thus, the more nodes we have, the fewer data each node runs. Before the system start train, the data is copied to each node. When we train the DNN, each node communicates after XX (?? Hang, could you add the number here) runs of the total data.  
+\subsection{Choice of step size}
 Our neural network training use a learning rate schedule stated as below:
 \begin{itemize}
 \item The training starts with a pre-defined learning rate.
@@ -190,7 +191,10 @@ reduction method, allreduce performs best.
 \end{table}
 
 \subsection{Speedup and scaling factor}
-Table~\ref{tab:speedup} shows
+
+In this section, the training time and scaling factor is illustrated, see Table~\ref{tab:speedup}. Since butterfly mixing require the number of nodes to be power of two, we tried node number to be 4, 8, 16 for butterfly and ring. From the results we can find that strong scaling of our implement is close to one except when the number of nodes is 16 and reduce strategy is Allreduce. Thus, our implement is relatively efficient with good scalibility. \\
+
+Comparing the training time of butterfly mixing with Allreduce and ring, we can find that for all cases, butterfly mixing uses less time to finish training than Allreduce, which is caused by less network communication time. For the best situation, the training time saving between butterfly mixing and Allreduce is 20\%. Even for the worest situation, the training time saving between butterfly mixing and Allreduce is 1\%. The training time between butterfly mixing and ring is relatively small: the percentage difference varies from 0.5\% to 12\%. 
 
 \begin{table}
   \centering
@@ -198,14 +202,17 @@ Table~\ref{tab:speedup} shows
     \hline
            \multicolumn{2}{c|}{Nodes}   & 1    & 2    & 4    & 8    & 16 \\
     \hline
-\multirow{2}{*}{Allreduce} &    Time    & 6.59 & 3.39 & 1.90 & 1.01 & 0.700\\
-                           &    speedup & --   & 1.94 & 3.47 & 6.52 & 9.41 \\
+\multirow{3}{*}{Allreduce} &    Time    & 6.59 & 3.39 & 1.90 & 1.01 & 0.700\\
+                           &    speedup & --   & 1.94 & 3.47 & 6.52 & 9.41\\
+                           &strong scaling& -- & 0.97 & 0.87 &0.82 & 0.59 \\
     \hline
-\multirow{2}{*}{Butterfly} &    Time    & --   & --   & 1.83 & 1.00 & 0.582\\
+\multirow{3}{*}{Butterfly} &    Time    & --   & --   & 1.83 & 1.00 & 0.582\\
                            &    speedup & --   & --   & 3.60 & 6.59 & 11.32\\
+                           &strong scaling&--  & --   & 0.90 & 0.82 & 0.71\\
     \hline
-\multirow{2}{*}{Ring}      &    Time    & --   & --   & 1.84 & 1.01 & 0.517\\
+\multirow{3}{*}{Ring}      &    Time    & --   & --   & 1.84 & 1.01 & 0.517\\
                            &    speedup & --   & --   & 3.58 & 6.52 & 12.75\\
+                           &strong scaling&--  & --   & 0.89 & 0.82 & 0.80\\
     \hline
   \end{tabular}
   \caption{Training time and speedup}
@@ -213,7 +220,11 @@ Table~\ref{tab:speedup} shows
 \end{table}
 
 \subsection{Recognition results}
-Table~\ref{tab:wer} shows
+
+In this section, we apply our trained DNN to do the speech recognition to test the performance of the models. 
+Table~\ref{tab:wer} illustrates the word error rate (WER) of the test results. A lower WER means the recognition results are more accurate. Since we fixed the total number of data points we used to train the DNN, there is a trade between the batch size and the synchronization. The more nodes means that for each reduction, more information is collected and averaged. However, the more nodes also means that information's asynchronization is heavier, becuase we do not communicate the weights at each update. Usually the performance of distributed system should be worse than single node. However, we find the gap between single node and distributed system is small, for some cases, the performance of distributed system is even better than single node, which means the distributed system can also get close optimal weights. \\
+
+With increasing the number of nodes, the WER increases for all the communication strategies. When the number of nodes is 4 and 8, the WER of butterfly mixing is close to the allreduce, the WER of ring is larger than butterfly mixing. When the number of nodes is 16, the gaps among allreduce, butterfly mixing, and ring become large (but still in 10\%). In sum, the performance of DNN trained by butterfly mixing is slightly worse than that of allreduce, but better than that of ring.
 \begin{table}
   \centering
   \begin{tabular}{c|c|c|c|c|c}
