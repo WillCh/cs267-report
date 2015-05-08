@@ -192,8 +192,13 @@ reduction method, allreduce performs best.
 
 \subsection{Speedup and scaling factor}
 
-In this section, the training time and scaling factor is illustrated, see Table~\ref{tab:speedup}. Since butterfly mixing require the number of nodes to be power of two, we tried node number to be 4, 8, 16 for butterfly and ring. From the results we can find that strong scaling of our implement is close to one except when the number of nodes is 16 and reduce strategy is Allreduce. Thus, our implement is relatively efficient with good scalibility. \\
-
+In this section, the training time and scaling factor is illustrated, see Table~\ref{tab:speedup} and Fig~\ref{fig:strongS}. Since butterfly mixing require the number of nodes to be power of two, we tried node number to be 4, 8, 16 for butterfly and ring. From the results we can find that strong scaling of our implement is close to one except when the number of nodes is 16 and reduce strategy is Allreduce. Thus, our implement is relatively efficient with good scalibility. \\
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.5\textwidth]{strongS.jpeg}
+  \caption{strong scaling}
+  \label{fig:strongS}
+\end{figure}
 Comparing the training time of butterfly mixing with Allreduce and ring, we can find that for all cases, butterfly mixing uses less time to finish training than Allreduce, which is caused by less network communication time. For the best situation, the training time saving between butterfly mixing and Allreduce is 20\%. Even for the worest situation, the training time saving between butterfly mixing and Allreduce is 1\%. The training time between butterfly mixing and ring is relatively small: the percentage difference varies from 0.5\% to 12\%. 
 
 \begin{table}
